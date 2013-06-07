@@ -1,0 +1,402 @@
+#!/bin/bash
+
+function header() {
+    echo
+    args_or_stdin "$@" | bigger | bold
+    line "$COLUMNS" '-' | bold | black
+    echo
+}
+
+function - () {
+    linewrap "⠀• $*"
+    echo
+}
+
+function codeblock() {
+    (
+        IFS=''
+        inputmargin="undefined"
+        line "$((COLUMNS-6))" ' '
+        COLUMNS=$((COLUMNS-6)) linewrap "$@" | while read line; do
+            if [[ "${inputmargin}" == "undefined" ]]; then
+                inputmargin="${line%%[^ ]*}"
+            fi
+            echo "${line#${inputmargin}}"
+        done
+        echo
+    ) | margin_left 2 | bold | green | box
+}
+
+function ci() {
+    # code inline
+    green "$@" | bold
+}
+
+function param() {
+    underline "$@" | ci
+}
+
+function slide_title() {
+    pad_on_bottom $(((LINES-6)/2)) ' '
+    bigger "Bash Scripting" | bold | center
+    echo
+    fullwidth "Evan Krall" | bold | blue | center
+}
+
+function slide_two() {
+    header "Who am I"
+    - Systems team
+    - Bash scripting for \>10 years
+}
+
+function slide_three() {
+    header "Outline"
+    - Basic grammar
+    - Expansion order
+    - Arrays
+    - Scoping and subshells
+    - Testing
+}
+
+function slide_simplecommand() {
+    header "Simple commands"
+    - Optional list of variable assignments
+    - blank-separated words and redirections
+
+    codeblock <<"END"
+        echo "foo" >foo.txt
+        rm -rf /
+        grep -r 'hello' . 2>/dev/null
+        PYTHONPATH="$HOME/pg/yelp-main" python blah.py
+END
+}
+
+function slide_pipeline() {
+    header "Pipelines"
+    - A pipeline is a sequence of one or more commands separated by the pipe character: $(ci \|)
+    echo
+    center "[$(ci time) [$(ci -p)]] [ "$(ci '!')" ] $(param command) [ $(ci "| $(param command2)") ... ]"
+}
+
+function slide_lists() {
+    header "Lists"
+    - "Sequence of pipelines, separated by $(ci ';'), $(ci '&'), $(ci '||'), $(ci '&&')"
+    - "If a command ends in $(ci '&'), the shell executes the command in the background in a subshell"
+    - Return status of a list is the exit status of the last command executed
+}
+
+function slide_lists_contd() {
+    header "Lists (cont'd)"
+    - $(ci '||') and $(ci '&&') are lazy-evaluated
+    - Equal precedence.
+    codeblock <<"END"
+        $ true && echo "hi"
+        hi
+        $ false && echo "hi"
+        $ false && echo "true" || echo "false"
+        false
+END
+}
+
+function slide_if() {
+    header "if - elif - else - fi"
+    codeblock <<END
+        if $(param list); then
+            $(param list)
+        elif $(param list); then
+            $(param list)
+        else
+            $(param list)
+        fi
+END
+}
+
+function slide_while() {
+    header "while - do - done"
+    codeblock <<END
+        while $(param list1); do
+            $(param list2)
+        done
+END
+    - while $(param list1) returns zero, executes $(param list2)
+}
+
+function slide_for() {
+    header "for - in - do - done"
+    codeblock <<END
+        for $(param name) in $(param word); do
+            $(param list)
+        done
+END
+    - The list of words following $(ci in) is expanded, generating a list of items. \
+    The variable $(param name) is set to each element  of this list in turn, and\
+    $(param list) is executed each time.
+}
+
+
+function slide_functions() {
+    header "function definitions"
+    echo
+    center "[$(ci function)] $(param name) [$(ci "()")] $(param compound-command)"
+    echo
+    - $(ci function) and $(ci '()') are optional, but you must have at least one.
+    codeblock <<END
+    # These are equivalent:
+    function foo() {
+        ...
+    }
+    function foo {
+        ...
+    }
+    foo() {
+        ...
+    }
+END
+}
+
+function slide_functions_contd() {
+    header "function definitions (cont'd)"
+    - If you use $(ci '()') instead of $(ci '{}'), the contents of the function get executed in a subshell.
+    - You can also specify a redirection for the whole function:
+    codeblock <<END
+        function foo() {
+            echo "blah"
+        } >/dev/null
+
+        $ foo
+        $
+END
+    - Return code is exit code of last command executed.
+}
+
+
+function slide_expansion() {
+    header "Expansion"
+    - Brace expansion
+    - Tilde expansion
+    - Parameter and variable expansion
+    - Command substitution
+    - Arithmetic expansion
+    - Word splitting
+    - Pathname expansion
+}
+
+
+function slide_brace_expansion() {
+    header "Brace expansion"
+    codeblock <<END
+        $ echo a{d,c,b}e
+        ade ace abe
+        $ echo {1..10}
+        1 2 3 4 5 6 7 8 9 10
+        $ echo {01..10}  # bash 4
+        01 02 03 04 05 06 07 08 09 10
+        $ echo {01..10}  # bash 3
+        1 2 3 4 5 6 7 8 9 10
+        $ echo \'{a..e}\'
+        'a' 'b' 'c' 'd' 'e'
+        $ echo {0,1}{a,b}
+        0a 0b 1a 1b
+END
+}
+
+function slide_tilde_expansion() {
+    header "Tilde expansion"
+    - Expands to \$HOME, or someone else\'s home dir.
+    codeblock <<"END"
+        $ echo ~
+        /Users/krall
+        $ echo ~abakun # on a dev machine
+        /nail/home/abakun
+END
+}
+
+
+function slide_parameter_expansion() {
+    header "Parameter expansion"
+    codeblock <<"END"
+        $ var="Bash scripting is cool"
+        $ echo $var
+        Bash scripting is cool
+        $ echo ${var}
+        Bash scripting is cool
+        $ echo ${var#* } -- ${var##* }
+        scripting is cool -- cool
+        $ echo ${var% *} -- ${var%% *}
+        Bash scripting is -- Bash
+END
+}
+
+function slide_parameter_expansion_2() {
+    header "Parameter expansion (cont'd)"
+    codeblock <<"END"
+        $ var="Bash scripting is cool"
+        $ echo ${var:10}
+        ting is cool
+        $ echo [${var:10:4}]
+        [ting]
+        $ echo ${var/ /_}
+        Bash_scripting is cool
+        $ echo ${var// /_}
+        Bash_scripting_is_cool 
+END
+}
+
+function slide_command_substitution() {
+    header "Command substitution"
+    center "$(ci "\$\($(param command)\)")"
+    center or
+    center "$(ci "\`$(param command)\`")"
+    echo
+    - Runs $(param command), replaces the command substitution with the standard output of the command
+    - Trailing newlines are deleted.
+    codeblock <<"END"
+        $ echo $(echo foo)
+        foo
+        $ echo The last word in the dictionary is $(tail -n1 /usr/share/dict/words)
+        The last word in the dictionary is Zyzzogeton
+END
+}
+
+function slide_arithmetic() {
+    header "Arithmetic Expansion"
+    echo
+    center "$(ci '$(('"$(param expression)"'))')"
+    echo
+    codeblock <<"END"
+        $ echo $((2+2))
+        4
+        $ foo=3; echo $((2+foo)); echo $((2+$foo))
+        5
+        5
+END
+}
+
+function slide_word_splitting() {
+    header "Word splitting"
+    - The shell scans the results of parameter expansion, command substitution,\
+     and arithmetic expansion that $(bold "did not occur within double quotes") for word splitting.
+
+    codeblock <<"END"
+        $ function show_words() { for word in "$@"; do echo -n "'${word}' "; done; echo; }
+        $ show_words hi hello
+        'hi' 'hello'
+        $ show_words "hi hello"
+        'hi hello'
+        $ var="Bash scripting is cool"
+        $ show_words $var
+        'Bash' 'scripting' 'is' 'cool'
+        $ show_words "$var"
+        'Bash scripting is cool'
+END
+}
+
+function slide_pathname_expansion() {
+    header "Pathname expansion"
+    - After word splitting, bash scans each word for the characters $(ci \*), $(ci \?), and \
+       $(ci \[).  If one of these characters appears, then the word is regarded as a pattern, and \
+       replaced with an alphabetically  sorted  list  of  file names matching the pattern.
+
+    codeblock <<"END"
+        $ mkdir demo; cd demo; touch foo.txt bar.txt baz.txt
+        $ echo *
+        bar.txt baz.txt foo.txt
+        $ echo bar*
+        bar.txt
+        $ echo ba?.txt
+        bar.txt baz.txt
+        $ foo='*'
+        $ echo "$foo" versus $foo
+        * versus bar.txt baz foo.txt
+END
+}
+
+function slide_arrays() {
+    header "Arrays"
+    - Arrays in bash are one-dimensional sparse arrays of strings
+    codeblock <<"END"
+        $ var="One"
+        $ var[1]="Two"
+        $ echo $var
+        One
+        $ echo $var[1] versus ${var[1]}
+        One[1] versus Two
+        $ show_words "${var[*]}"
+        'One Two'
+        $ show_words "${var[@]}"
+        'One' 'Two'
+END
+}
+
+function slide_arrays_2() {
+    header "Arrays (cont'd)"
+    codeblock <<"END"
+        $ array=("one" "two" "third word")
+        $ show_words ${var[*]}
+        'one' 'two' 'third' 'word'
+        $ show_words "${var[*]}"
+        'one two third word'
+        $ show_words "${var[@]}"
+        'one' 'two' 'third word'
+END
+}
+
+function slide_positional_parameters() {
+    header "Positional Parameters"
+    - $(ci \$0) through $(ci \$9), $(ci \${10}) ...
+    - Special parameters $(ci '$*') and $(ci '$@') evaluate to all arguments.
+    codeblock <<"END"
+        $ function switch() { echo "$2" "$1"; }
+        $ switch foo bar
+        bar foo
+        $ function colons() { local IFS=':'; echo "$*"; }
+        $ colons hi hello
+        hi:hello
+END
+}
+
+function slide_scope() {
+    header "Scope"
+    - Generally global to your interpreter
+    - Can be made local to a function with the $(ci local) keyword
+    codeblock <<"END"
+        $ function foo() { local blah="hi"; echo $blah; }
+        $ function bar() { blah="hello"; echo $blah; }
+        $ blah=''
+        $ foo
+        hi
+        $ bar
+        hello
+        $ echo $blah
+        hello
+END
+}
+
+function slide_scope_subshells() {
+    header "Scope (subshells)"
+    - Commands in a subshell executes in a new interpreter
+    codeblock <<"END"
+        $ function baz() ( blah="hello"; echo $blah; )
+        $ blah=''
+        $ baz
+        hello
+        $ echo $blah
+
+        $
+END
+}
+
+function slide_testing() {
+    header Testing
+    - You can, in fact, write tests for bash scripts.
+    - It\'s just tricky, since many bash scripts have side effects.
+    - It helps if you break your code into small, side-effect-free functions.
+
+    codeblock <<"END"
+        # Let your code be sourced safely by including a block like this:
+        if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+            # not being sourced.
+            main "$@"
+        fi
+END
+}
